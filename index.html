@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Low-Data Relay</title>
+<style>
+  :root {
+    --bg: #12130f;
+    --panel: #1b1c16;
+    --line: #2c2e24;
+    --text: #ece8dd;
+    --text-dim: #8b8d80;
+    --accent: #c7f464;
+    --accent-dim: #7a8f3d;
+    --danger: #e0654a;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 0 16px;
+  }
+
+  main {
+    width: 100%;
+    max-width: 440px;
+    padding-top: max(32px, env(safe-area-inset-top));
+    padding-bottom: 48px;
+  }
+
+  .eyebrow {
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent-dim);
+    margin: 0 0 6px;
+  }
+
+  h1 {
+    font-size: 26px;
+    margin: 0 0 4px;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+  }
+
+  .sub {
+    color: var(--text-dim);
+    font-size: 14px;
+    margin: 0 0 28px;
+    line-height: 1.5;
+  }
+
+  label {
+    display: block;
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+  }
+
+  input[type="text"] {
+    width: 100%;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 14px 14px;
+    color: var(--text);
+    font-size: 15px;
+    outline: none;
+  }
+
+  input[type="text"]:focus {
+    border-color: var(--accent-dim);
+  }
+
+  .row {
+    display: flex;
+    gap: 10px;
+    margin-top: 12px;
+  }
+
+  button {
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 600;
+    border: none;
+    border-radius: 10px;
+    padding: 14px 18px;
+    cursor: pointer;
+    transition: opacity 0.15s ease, transform 0.1s ease;
+  }
+
+  button:active { transform: scale(0.98); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .btn-go {
+    flex: 1;
+    background: var(--accent);
+    color: #14150f;
+  }
+
+  .panel {
+    margin-top: 32px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 20px;
+  }
+
+  .status-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+
+  .dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--text-dim);
+    flex-shrink: 0;
+  }
+
+  .dot.running { background: var(--accent); box-shadow: 0 0 0 4px rgba(199,244,100,0.15); }
+  .dot.error { background: var(--danger); box-shadow: 0 0 0 4px rgba(224,101,74,0.15); }
+
+  .status-text {
+    font-size: 14px;
+    color: var(--text-dim);
+  }
+
+  .status-text strong { color: var(--text); font-weight: 600; }
+
+  .controls {
+    display: flex;
+    gap: 10px;
+  }
+
+  .btn-play {
+    flex: 1;
+    background: var(--accent);
+    color: #14150f;
+  }
+
+  .btn-stop {
+    flex: 1;
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--text);
+  }
+
+  audio {
+    width: 100%;
+    margin-top: 16px;
+    display: none;
+  }
+
+  audio.visible { display: block; }
+
+  .hint {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 20px;
+    line-height: 1.6;
+  }
+
+  .hint code {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    padding: 1px 6px;
+    font-size: 11.5px;
+  }
+
+  .error-box {
+    margin-top: 14px;
+    background: rgba(224,101,74,0.1);
+    border: 1px solid rgba(224,101,74,0.3);
+    color: #f2a794;
+    font-size: 12.5px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    display: none;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 220px;
+    overflow-y: auto;
+    font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  }
+
+  .error-box.visible { display: block; }
+</style>
+</head>
+<body>
+<main>
+  <p class="eyebrow">Audio relay</p>
+  <h1>Low-data live audio</h1>
+  <p class="sub">Paste a YouTube live link. It plays back at 32&nbsp;kbps so it costs a fraction of the data a normal stream would.</p>
+
+  <label for="url">YouTube live URL</label>
+  <input type="text" id="url" placeholder="https://www.youtube.com/watch?v=..." autocomplete="off" autocapitalize="off" spellcheck="false" />
+  <div class="row">
+    <button class="btn-go" id="goBtn">Go</button>
+  </div>
+
+  <div class="error-box" id="errorBox"></div>
+
+  <div class="panel">
+    <div class="status-row">
+      <div class="dot" id="statusDot"></div>
+      <div class="status-text" id="statusText">Stopped</div>
+    </div>
+
+    <div class="controls">
+      <button class="btn-play" id="playBtn" disabled>Play</button>
+      <button class="btn-stop" id="stopBtn" disabled>Stop</button>
+    </div>
+
+    <audio id="player" preload="none"></audio>
+  </div>
+
+  <p class="hint">
+    <strong>Play</strong> starts the relay and streams audio here.<br/>
+    <strong>Stop</strong> shuts the relay down completely — do this when you're done so it doesn't keep running in the background.
+  </p>
+</main>
+
+<script>
+  const urlInput = document.getElementById('url');
+  const goBtn = document.getElementById('goBtn');
+  const playBtn = document.getElementById('playBtn');
+  const stopBtn = document.getElementById('stopBtn');
+  const player = document.getElementById('player');
+  const statusDot = document.getElementById('statusDot');
+  const statusText = document.getElementById('statusText');
+  const errorBox = document.getElementById('errorBox');
+
+  function showError(msg) {
+    errorBox.textContent = msg;
+    errorBox.classList.add('visible');
+  }
+
+  function clearError() {
+    errorBox.classList.remove('visible');
+  }
+
+  function setStatus(status) {
+    statusDot.classList.remove('running', 'error');
+    if (status === 'running') {
+      statusDot.classList.add('running');
+      statusText.innerHTML = '<strong>Live</strong> — relaying audio';
+      playBtn.disabled = false;
+      stopBtn.disabled = false;
+      goBtn.disabled = true;
+    } else if (status === 'error') {
+      statusDot.classList.add('error');
+      statusText.innerHTML = '<strong>Error</strong> — see message above';
+      playBtn.disabled = true;
+      stopBtn.disabled = false;
+      goBtn.disabled = false;
+    } else if (status === 'starting') {
+      statusText.innerHTML = '<strong>Starting…</strong> this can take a few seconds';
+      playBtn.disabled = true;
+      stopBtn.disabled = false;
+      goBtn.disabled = true;
+    } else {
+      statusText.textContent = 'Stopped';
+      playBtn.disabled = true;
+      stopBtn.disabled = true;
+      goBtn.disabled = false;
+      player.pause();
+      player.removeAttribute('src');
+      player.classList.remove('visible');
+    }
+  }
+
+  async function refreshStatus() {
+    try {
+      const res = await fetch('/api/status');
+      const data = await res.json();
+      setStatus(data.status);
+      if (data.status === 'error' && data.error) {
+        let msg = data.error;
+        if (data.log_tail && data.log_tail.length) {
+          msg += '\n\n' + data.log_tail.join('\n');
+        }
+        showError(msg);
+      }
+    } catch (e) {
+      // network hiccup, ignore — next poll will retry
+    }
+  }
+
+  goBtn.addEventListener('click', async () => {
+    clearError();
+    const url = urlInput.value.trim();
+    if (!url) {
+      showError('Paste a YouTube URL first.');
+      return;
+    }
+    setStatus('starting');
+    try {
+      const res = await fetch('/api/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        showError(data.error || 'Could not start the relay.');
+        setStatus('stopped');
+        return;
+      }
+      setStatus('running');
+    } catch (e) {
+      showError('Could not reach the server. Try again in a moment.');
+      setStatus('stopped');
+    }
+  });
+
+  playBtn.addEventListener('click', () => {
+    player.src = '/stream.mp3?t=' + Date.now();
+    player.classList.add('visible');
+    player.play().catch(() => {
+      showError('Tap Play again — your browser blocked autoplay.');
+    });
+  });
+
+  stopBtn.addEventListener('click', async () => {
+    clearError();
+    player.pause();
+    try {
+      await fetch('/api/stop', { method: 'POST' });
+    } catch (e) {
+      // best effort
+    }
+    setStatus('stopped');
+  });
+
+  refreshStatus();
+  setInterval(refreshStatus, 5000);
+</script>
+</body>
+</html>
